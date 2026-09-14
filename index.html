@@ -1,46 +1,167 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<title>我的世界</title>
-<link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-<canvas id="canvas"></canvas>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="方境：一个可挖掘、建造和探索的浏览器体素沙盒游戏。"
+    />
+    <title>方境 Blockfrontier</title>
+  </head>
+  <body>
+    <canvas id="game-canvas" aria-label="方境游戏画面"></canvas>
+    <noscript>方境需要启用 JavaScript 和 WebGL 2 才能运行。</noscript>
 
-<div id="overlay">
-  <h1>我的世界</h1>
-  <div class="tagline">探索 · 建造 · 生存</div>
-  <button id="startBtn">开始游戏</button>
-  <div id="controls">
-    WASD 移动 &nbsp;·&nbsp; 空格 跳跃 &nbsp;·&nbsp; Shift 下蹲<br>
-    鼠标左键 挖掘方块 &nbsp;·&nbsp; 鼠标右键 放置方块<br>
-    滚轮 / 数字键 切换方块 &nbsp;·&nbsp; F 飞行模式 &nbsp;·&nbsp; ESC 暂停
-  </div>
-</div>
+    <div id="vignette"></div>
+    <div id="crosshair" class="hidden" aria-hidden="true">
+      <span></span><span></span>
+    </div>
+    <div id="target-hint" class="target-hint hidden" aria-live="polite">
+      把中央十字移到一个方块上
+    </div>
 
-<div id="hud">
-  <svg id="crosshair" viewBox="0 0 22 22">
-    <line x1="11" y1="2" x2="11" y2="20" stroke="black" stroke-width="2.5" opacity="0.6"/>
-    <line x1="2" y1="11" x2="20" y2="11" stroke="black" stroke-width="2.5" opacity="0.6"/>
-    <line x1="11" y1="2" x2="11" y2="20" stroke="white" stroke-width="1.5" opacity="0.9"/>
-    <line x1="2" y1="11" x2="20" y2="11" stroke="white" stroke-width="1.5" opacity="0.9"/>
-  </svg>
-  <div id="hotbar"></div>
-  <div id="selected-name"></div>
-  <div id="debug"></div>
-  <div id="break-bar"><div id="break-fill"></div></div>
-  <div id="pause-screen">
-    <h2>游戏已暂停</h2>
-    <p>点击画面继续</p>
-  </div>
-</div>
+    <header id="hud" class="hidden">
+      <div class="hud-card status-card">
+        <div class="meter-row">
+          <span class="meter-label">生命</span>
+          <div id="health-meter" class="pixel-meter"></div>
+        </div>
+        <div class="meter-row">
+          <span class="meter-label">体力</span>
+          <div id="stamina-meter" class="pixel-meter stamina"></div>
+        </div>
+      </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/noise.js"></script>
-<script src="js/blocks.js"></script>
-<script src="js/world.js"></script>
-<script src="js/game.js"></script>
-<script src="js/main.js"></script>
-</body>
+      <div class="hud-card world-card">
+        <span id="world-time">第 1 天 08:00</span>
+        <span id="biome-label">草原</span>
+        <span id="position-label">X 0 · Y 0 · Z 0</span>
+      </div>
+
+      <button id="guide-button" class="guide-chip" type="button">
+        <span class="guide-dot"></span>
+        世界向导 <kbd>G</kbd>
+      </button>
+    </header>
+
+    <div id="toast-region" aria-live="polite"></div>
+
+    <main id="start-screen" class="screen active">
+      <div class="sky-decoration">
+        <div class="sun-block"></div>
+        <div class="cloud cloud-a"></div>
+        <div class="cloud cloud-b"></div>
+      </div>
+
+      <section class="hero-panel">
+        <p class="eyebrow">A VOXEL SANDBOX</p>
+        <h1>
+          <span>方</span><span>境</span>
+          <small>BLOCKFRONTIER</small>
+        </h1>
+        <p class="hero-copy">
+          走进一片会呼吸的方块大陆。挖开山脉，穿过樱花林，在夜幕降临前点亮你的第一座家。
+        </p>
+
+        <div class="world-form">
+          <label for="seed-input">世界种子</label>
+          <div class="seed-row">
+            <input id="seed-input" maxlength="32" value="FANGJING-2026" />
+            <button id="random-seed" class="icon-button" type="button" aria-label="随机种子">
+              换一个
+            </button>
+          </div>
+          <button id="start-button" class="primary-button" type="button">
+            <span>生成新世界</span>
+            <small>单人探索模式</small>
+          </button>
+          <button id="import-button" class="text-button" type="button">从备份恢复世界</button>
+          <input id="import-file" type="file" accept=".json,application/json" hidden />
+          <p id="storage-status" role="status" class="version-note"></p>
+        </div>
+
+        <div class="feature-strip">
+          <span>程序化地形</span>
+          <span>昼夜生态</span>
+          <span>自由建造</span>
+          <span>铜傀儡</span>
+        </div>
+      </section>
+
+      <aside class="controls-panel">
+        <p class="panel-kicker">生存手册</p>
+        <h2>第一天，从这里开始</h2>
+        <div class="control-list">
+          <div><kbd>W / S</kbd><span>前进 / 后退</span></div>
+          <div><kbd>A / D</kbd><span>向左 / 向右</span></div>
+          <div><kbd>空格</kbd><span>跳跃</span></div>
+          <div><kbd>Shift</kbd><span>疾跑</span></div>
+          <div><kbd>鼠标左键</kbd><span>删除方块 / 攻击</span></div>
+          <div><kbd>右键 / F</kbd><span>在黄色框放置</span></div>
+          <div><kbd>1 - 8</kbd><span>切换物品</span></div>
+        </div>
+        <p class="version-note">
+          灵感来自《我的世界》现行版本的铜主题、环境氛围与生物变体。
+        </p>
+      </aside>
+
+      <footer class="start-footer">
+        <span>独立体素游戏原型</span>
+        <span>桌面浏览器 · 建议使用耳机</span>
+      </footer>
+    </main>
+
+    <section id="pause-screen" class="screen pause-screen">
+      <div class="pause-card">
+        <p class="eyebrow">WORLD PAUSED</p>
+        <h2>世界已暂停</h2>
+        <p>点击继续，回到你的方块世界。</p>
+        <button id="resume-button" class="primary-button compact" type="button">继续探索</button>
+        <button id="save-button" class="secondary-button" type="button">保存世界</button>
+        <button id="export-button" class="secondary-button" type="button">导出备份</button>
+        <button id="quit-button" class="text-button" type="button">返回主菜单</button>
+        <button id="discard-button" class="text-button hidden" type="button">放弃未保存进度并返回</button>
+      </div>
+    </section>
+
+    <section id="guide-panel" class="side-panel" aria-label="世界向导">
+      <div class="panel-header">
+        <div>
+          <p class="panel-kicker">探索 · 建造 · 生存</p>
+          <h2>世界向导</h2>
+        </div>
+        <button id="guide-close" class="close-button" type="button" aria-label="关闭">×</button>
+      </div>
+      <div id="guide-output" class="guide-output">
+        <span class="guide-avatar">AI</span>
+        <p>我可以根据你所在的位置、时间和附近资源，给出一个简短的探索目标。</p>
+      </div>
+      <div class="prompt-chips">
+        <button type="button" data-prompt="给我一个适合现在完成的探索目标">探索目标</button>
+        <button type="button" data-prompt="分析附近资源，告诉我适合在哪里建家">选址建议</button>
+        <button type="button" data-prompt="给我一个有创意但规模不大的建筑挑战">建筑挑战</button>
+      </div>
+      <form id="guide-form">
+        <label for="guide-input">问问这个世界</label>
+        <div class="guide-input-row">
+          <input id="guide-input" maxlength="240" placeholder="例如：附近有什么值得探索？" />
+          <button type="submit">发送</button>
+        </div>
+      </form>
+      <p id="guide-status" class="guide-status">等待连接</p>
+    </section>
+
+    <div id="hotbar" class="hotbar hidden" aria-label="快捷栏"></div>
+    <div id="action-hint" class="action-hint hidden" aria-live="polite">
+      <span><kbd>W</kbd> 前进 <kbd>S</kbd> 后退 <kbd>A / D</kbd> 左右</span>
+      <span class="action-divider">·</span>
+      <span><kbd>左键</kbd> 删除方块</span>
+      <span class="action-divider">·</span>
+      <span><kbd>按住右键 / F</kbd> 黄色框连续放置</span>
+    </div>
+    <div id="interaction-hint" class="interaction-hint hidden">点击画面继续</div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>
